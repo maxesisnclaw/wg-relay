@@ -59,6 +59,10 @@ func (r *Relay) runClientTCP(ctx context.Context, udpListener *net.UDPConn, cfg 
 			return nil, err
 		}
 		log.Printf("Connected to %s", remoteAddr)
+		if tc, ok := conn.(*net.TCPConn); ok {
+			tc.SetKeepAlive(true)
+			tc.SetKeepAlivePeriod(30 * time.Second)
+		}
 		tcpConn = conn
 
 		// Read responses from TCP and forward back as UDP
@@ -179,8 +183,16 @@ func (r *Relay) runServer(ctx context.Context, tcpListener net.Listener, cfg Con
 	}
 }
 
+const serverReadTimeout = 60 * time.Second // WG keepalive is 25s, 60s = safe margin
+
 func (r *Relay) handleServerConn(ctx context.Context, tcpConn net.Conn, forwardAddr *net.UDPAddr) {
 	defer tcpConn.Close()
+
+	// Enable TCP keepalive
+	if tc, ok := tcpConn.(*net.TCPConn); ok {
+		tc.SetKeepAlive(true)
+		tc.SetKeepAlivePeriod(30 * time.Second)
+	}
 
 	udpConn, err := net.DialUDP("udp", nil, forwardAddr)
 	if err != nil {
@@ -216,9 +228,12 @@ func (r *Relay) handleServerConn(ctx context.Context, tcpConn net.Conn, forwardA
 		default:
 		}
 
+		// Read deadline: detect silently dead connections
+		// WG sends keepalive every 25s, so 60s without data = dead
+		tcpConn.SetReadDeadline(time.Now().Add(serverReadTimeout))
 		data, err := readFrame(tcpConn)
 		if err != nil {
-			log.Printf("Client disconnected: %s", tcpConn.RemoteAddr())
+			log.Printf("Client disconnected: %s (%v)", tcpConn.RemoteAddr(), err)
 			return
 		}
 		r.BytesSent.Add(uint64(len(data)))
