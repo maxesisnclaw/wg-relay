@@ -72,7 +72,13 @@ func runGUI() {
 				Children: []Widget{
 					Label{AssignTo: &statusLabel, Text: "\u25cf Stopped"},
 					Label{AssignTo: &statsLabel, Text: ""},
-					PushButton{AssignTo: &toggleBtn, Text: "Start", OnClicked: onToggle},
+					Composite{
+						Layout: HBox{},
+						Children: []Widget{
+							PushButton{AssignTo: &toggleBtn, Text: "Start", MaxSize: Size{Width: 120}, OnClicked: onToggle},
+							HSpacer{},
+						},
+					},
 				},
 			},
 			GroupBox{
@@ -90,9 +96,9 @@ func runGUI() {
 				Layout: Grid{Columns: 4, Spacing: 6},
 				Children: []Widget{
 					Label{Text: "Address:"},
-					LineEdit{AssignTo: &listenAddrLE, Text: cfg.ListenAddr},
+					LineEdit{AssignTo: &listenAddrLE, Text: cfg.ListenAddr, StretchFactor: 3},
 					Label{Text: "Port:"},
-					LineEdit{AssignTo: &listenPortLE, Text: itoa(cfg.ListenPort), MaxLength: 5},
+					LineEdit{AssignTo: &listenPortLE, Text: itoa(cfg.ListenPort), MaxLength: 5, MinSize: Size{Width: 70}},
 				},
 			},
 			GroupBox{
@@ -100,9 +106,9 @@ func runGUI() {
 				Layout: Grid{Columns: 4, Spacing: 6},
 				Children: []Widget{
 					Label{Text: "Address:"},
-					LineEdit{AssignTo: &remoteAddrLE, Text: cfg.RemoteAddr},
+					LineEdit{AssignTo: &remoteAddrLE, Text: cfg.RemoteAddr, StretchFactor: 3},
 					Label{Text: "Port:"},
-					LineEdit{AssignTo: &remotePortLE, Text: itoa(cfg.RemotePort), MaxLength: 5},
+					LineEdit{AssignTo: &remotePortLE, Text: itoa(cfg.RemotePort), MaxLength: 5, MinSize: Size{Width: 70}},
 				},
 			},
 			GroupBox{
@@ -110,9 +116,9 @@ func runGUI() {
 				Layout: Grid{Columns: 4, Spacing: 6},
 				Children: []Widget{
 					Label{Text: "Address:"},
-					LineEdit{AssignTo: &forwardAddrLE, Text: cfg.ForwardAddr},
+					LineEdit{AssignTo: &forwardAddrLE, Text: cfg.ForwardAddr, StretchFactor: 3},
 					Label{Text: "Port:"},
-					LineEdit{AssignTo: &forwardPortLE, Text: itoa(cfg.ForwardPort), MaxLength: 5},
+					LineEdit{AssignTo: &forwardPortLE, Text: itoa(cfg.ForwardPort), MaxLength: 5, MinSize: Size{Width: 70}},
 				},
 			},
 			Composite{
