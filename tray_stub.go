@@ -2,7 +2,7 @@
 
 package main
 
-func hasGUI() bool         { return false }
-func runGUI()              { runHeadless() }
-func setAutoStart(bool)    {}
-func openConfigInEditor()  {}
+func hasGUI() bool        { return false }
+func runGUI()             { runHeadless() }
+func setAutoStart(bool)   {}
+func openConfigInEditor() {}
