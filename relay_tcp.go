@@ -32,22 +32,33 @@ func (r *Relay) runClientTCP(ctx context.Context, udpListener *net.UDPConn, cfg 
 	remoteAddr := net.JoinHostPort(cfg.RemoteAddr, fmt.Sprintf("%d", cfg.RemotePort))
 
 	var (
-		tcpConn    net.Conn
-		tcpMu      sync.Mutex
-		clientAddr atomic.Pointer[net.UDPAddr]
+		tcpConn      net.Conn
+		tcpMu        sync.Mutex
+		clientAddr   atomic.Pointer[net.UDPAddr]
+		lastDialTime time.Time       // reconnect cooldown
+		dialCooldown = 5 * time.Second
 	)
 
 	dial := func() (net.Conn, error) {
 		tcpMu.Lock()
 		defer tcpMu.Unlock()
+
+		// Cooldown: don't spam reconnects
+		if time.Since(lastDialTime) < dialCooldown {
+			return nil, fmt.Errorf("cooldown (retry in %v)", dialCooldown-time.Since(lastDialTime))
+		}
+		lastDialTime = time.Now()
+
 		if tcpConn != nil {
 			tcpConn.Close()
 			tcpConn = nil
 		}
+		log.Printf("Connecting to %s ...", remoteAddr)
 		conn, err := net.DialTimeout("tcp", remoteAddr, 10*time.Second)
 		if err != nil {
 			return nil, err
 		}
+		log.Printf("Connected to %s", remoteAddr)
 		tcpConn = conn
 
 		// Read responses from TCP and forward back as UDP
@@ -61,6 +72,7 @@ func (r *Relay) runClientTCP(ctx context.Context, udpListener *net.UDPConn, cfg 
 					}
 					tcpMu.Unlock()
 					c.Close()
+					log.Printf("TCP connection lost, will reconnect on next packet")
 					return
 				}
 				r.BytesRecv.Add(uint64(len(data)))
@@ -105,8 +117,7 @@ func (r *Relay) runClientTCP(ctx context.Context, udpListener *net.UDPConn, cfg 
 			var dialErr error
 			conn, dialErr = dial()
 			if dialErr != nil {
-				log.Printf("TCP reconnect failed: %v", dialErr)
-				continue
+				continue // cooldown or dial error, drop packet silently
 			}
 		}
 

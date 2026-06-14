@@ -97,7 +97,12 @@ func (r *Relay) startClientUDP(ctx context.Context, cfg Config) (func(), error) 
 		return nil, fmt.Errorf("listen udp: %w", err)
 	}
 
-	remoteAddr := &net.UDPAddr{IP: net.ParseIP(cfg.RemoteAddr), Port: cfg.RemotePort}
+	remoteStr := net.JoinHostPort(cfg.RemoteAddr, fmt.Sprintf("%d", cfg.RemotePort))
+	remoteAddr, err := net.ResolveUDPAddr("udp", remoteStr)
+	if err != nil {
+		listener.Close()
+		return nil, fmt.Errorf("resolve remote %s: %w", remoteStr, err)
+	}
 
 	go r.runClientUDP(ctx, listener, remoteAddr)
 
