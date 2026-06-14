@@ -23,7 +23,7 @@ func (r *Relay) startClientTCP(ctx context.Context, cfg Config) (func(), error) 
 		return nil, fmt.Errorf("listen udp: %w", err)
 	}
 
-	go r.runClientTCP(ctx, listener, cfg)
+	r.safeGo(func() { r.runClientTCP(ctx, listener, cfg) })
 
 	return func() { listener.Close() }, nil
 }
@@ -151,7 +151,7 @@ func (r *Relay) startServer(ctx context.Context, cfg Config) (func(), error) {
 		return nil, fmt.Errorf("listen tcp: %w", err)
 	}
 
-	go r.runServer(ctx, listener, cfg)
+	r.safeGo(func() { r.runServer(ctx, listener, cfg) })
 
 	return func() { listener.Close() }, nil
 }

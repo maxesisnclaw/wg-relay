@@ -15,10 +15,17 @@ type Relay struct {
 	running bool
 	cancel  context.CancelFunc
 	cleanup func()
+	lastCfg Config // stored for auto-restart on panic
+
+	OnCrashRestart func() // GUI callback after panic recovery restart
 
 	BytesSent atomic.Uint64
 	BytesRecv atomic.Uint64
+
+	restartCount atomic.Int32
 }
+
+const maxAutoRestarts = 5 // prevent infinite restart loop
 
 func NewRelay() *Relay {
 	return &Relay{}
@@ -67,7 +74,46 @@ func (r *Relay) Start(cfg Config) error {
 	r.cancel = cancel
 	r.cleanup = cleanup
 	r.running = true
+	r.lastCfg = cfg
+	r.restartCount.Store(0) // reset on successful manual start
 	return nil
+}
+
+// safeGo wraps a relay goroutine with panic recovery + auto-restart.
+func (r *Relay) safeGo(fn func()) {
+	go func() {
+		defer func() {
+			if p := recover(); p != nil {
+				log.Printf("PANIC in relay goroutine: %v", p)
+				count := r.restartCount.Add(1)
+				if int(count) > maxAutoRestarts {
+					log.Printf("Too many auto-restarts (%d), giving up", count)
+					return
+				}
+				// Auto-restart
+				r.mu.Lock()
+				r.running = false
+				if r.cleanup != nil {
+					r.cleanup()
+				}
+				r.mu.Unlock()
+
+				backoff := time.Duration(count) * 2 * time.Second
+				log.Printf("Auto-restarting in %v (attempt %d/%d)...", backoff, count, maxAutoRestarts)
+				time.Sleep(backoff)
+
+				if err := r.Start(r.lastCfg); err != nil {
+					log.Printf("Auto-restart failed: %v", err)
+				} else {
+					log.Printf("Auto-restart succeeded")
+					if r.OnCrashRestart != nil {
+						r.OnCrashRestart()
+					}
+				}
+			}
+		}()
+		fn()
+	}()
 }
 
 func (r *Relay) Stop() {
@@ -104,7 +150,7 @@ func (r *Relay) startClientUDP(ctx context.Context, cfg Config) (func(), error) 
 		return nil, fmt.Errorf("resolve remote %s: %w", remoteStr, err)
 	}
 
-	go r.runClientUDP(ctx, listener, remoteAddr)
+	r.safeGo(func() { r.runClientUDP(ctx, listener, remoteAddr) })
 
 	return func() { listener.Close() }, nil
 }
