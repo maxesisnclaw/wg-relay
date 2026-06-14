@@ -88,23 +88,13 @@ func onReady() {
 		}
 	})
 
-	mReload := systray.AddMenuItem("Reload Config", "Reload and restart if running")
-	mReload.Click(func() {
-		if cfg, err := loadConfig(); err == nil {
-			config = cfg
-			if relay.IsRunning() {
-				relay.Stop()
-				if err := relay.Start(config); err != nil {
-					setUI(false, err.Error())
-				} else {
-					setUI(true, "")
-				}
-			}
-		}
+	mSettings := systray.AddMenuItem("Settings", "Open settings dialog")
+	mSettings.Click(func() {
+		openSettings()
 	})
 
-	mEdit := systray.AddMenuItem("Edit Config", "Open config.json in Notepad")
-	mEdit.Click(func() {
+	mEditFile := systray.AddMenuItem("Edit Config File", "Open config.json in Notepad")
+	mEditFile.Click(func() {
 		openConfigInEditor()
 	})
 
